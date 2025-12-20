@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data
+data/raw/**
+data/processed/**
+!data/README.md
+
+# Outputs
+outputs/**
+!outputs/**/.gitkeep
+
+# Environment
+.env
+.venv
