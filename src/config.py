@@ -1,0 +1,16 @@
+# src/config.py
+
+IMG_SIZE = (224, 224)
+IMG_CHANNELS = 3
+
+IMG_EMBED_DIM = 256
+TABULAR_MULTIPLIER = 4  # hidden_dim = 4 × num_features
+
+BATCH_SIZE = 16
+EPOCHS = 100
+LEARNING_RATE = 1e-4
+
+DROPOUT_TABULAR = 0.2
+DROPOUT_FUSION = 0.3
+
+RANDOM_SEED = 42
