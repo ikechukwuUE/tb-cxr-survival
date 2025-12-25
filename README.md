@@ -1,4 +1,3 @@
-```markdown
 # 🫁 Multimodal Survival Analysis for Tuberculosis
 
 ![Python](https://img.shields.io/badge/Python-3.9%2B-blue)
