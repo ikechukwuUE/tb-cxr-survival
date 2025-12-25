@@ -1,0 +1,90 @@
+# --------------------
+# Core scientific stack
+# --------------------
+numpy
+pandas
+scipy
+
+# --------------------
+# Visualization
+# --------------------
+matplotlib
+seaborn
+plotly
+
+# --------------------
+# Machine Learning
+# --------------------
+scikit-learn
+statsmodels
+
+# --------------------
+# Survival analysis (very important for TB, outcomes research)
+# --------------------
+lifelines
+scikit-survival
+
+# --------------------
+# Gradient boosting / tabular ML
+# --------------------
+xgboost
+lightgbm
+catboost
+
+# --------------------
+# Deep Learning
+# --------------------
+tensorflow
+torch
+torchvision
+torchaudio
+keras
+
+# --------------------
+# Medical imaging & image processing
+# --------------------
+opencv-python
+pydicom
+scikit-image
+Pillow
+albumentations
+
+# --------------------
+# Jupyter & notebooks
+# --------------------
+jupyter
+notebook
+ipykernel
+
+# --------------------
+# Experiment tracking & utilities
+# --------------------
+tqdm
+wandb
+joblib
+
+# --------------------
+# Data handling / file formats
+# --------------------
+openpyxl
+xlrd
+pyarrow
+h5py
+
+# --------------------
+# Model explainability
+# --------------------
+shap
+lime
+
+# --------------------
+# Configuration & reproducibility
+# --------------------
+pyyaml
+python-dotenv
+
+# --------------------
+# Optional but useful (medical + research workflows)
+# --------------------
+imbalanced-learn
+tensorboard
