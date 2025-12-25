@@ -1,4 +1,4 @@
-# 🫁 Multimodal Survival Analysis for Tuberculosis
+# 🫁 Multimodal Survival Analysis for Tuberculosis - TBSurvivalNet
 
 ![Python](https://img.shields.io/badge/Python-3.9%2B-blue)
 ![TensorFlow](https://img.shields.io/badge/TensorFlow-2.10%2B-orange)
@@ -8,7 +8,7 @@
 **Focus:** Multimodal Deep Learning (CXR + Clinical Data) for Prognosis
 
 ## 📌 Project Overview
-This repository implements a **State-of-the-Art (SOTA) Multimodal AI** framework for predicting time-to-event (survival analysis) in Pulmonary Tuberculosis patients. 
+This repository implements a **State-of-the-Art (SOTA) Multimodal AI (TBSurvivalNet)** framework for predicting time-to-event (survival analysis) in Pulmonary Tuberculosis patients. 
 
 Unlike traditional "Late Fusion" models that simply concatenate features, this project utilizes **Cross-Modal Attention mechanisms** [Wang et al., 2025; Zhou et al., 2023]. This allows clinical covariates (e.g., HIV status, Age) to dynamically "attend" to specific spatial regions of the Chest X-ray, mimicking how a radiologist incorporates clinical context into their visual assessment.
 

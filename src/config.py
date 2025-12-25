@@ -1,5 +1,12 @@
 # src/config.py
 
+# Columns to standardize (Continuous variables)
+CONTINUOUS_COLS = ["age", "bmi", "hemoglobin", "albumin"]
+# Columns to leave as binary/categorical
+BINARY_COLS = ["sex", "hiv", "diabetes", "smear_positive", "retreatment"]
+# All Clinical Columns for the model
+ALL_CLINICAL_COLS = CONTINUOUS_COLS + BINARY_COLS
+
 IMG_SIZE = (224, 224)
 IMG_CHANNELS = 3
 
