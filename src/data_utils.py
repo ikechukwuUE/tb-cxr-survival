@@ -5,6 +5,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from src.config import *
 import os
+import re
 import tensorflow as tf
 
 AUTOTUNE = tf.data.AUTOTUNE
@@ -125,36 +126,70 @@ def train_val_split(X_img, X_tab, time, event, test_size=0.2, seed=42):
     )
 
 
-def create_matched_dataframe(image_dir, output_path="data/processed/master_dataset.csv"):
+def create_matched_dataframe(image_dir, metadata_path, output_path="data/processed/master_dataset.csv"):
     """
-    Creates a synchronized dataset linking Shenzhen CXR images with synthetic clinical data.
-    
-    This addresses the data heterogeneity challenge highlighted in D'Souza et al., 2023,
-    ensuring every image has a corresponding clinical vector for multimodal training.
+    Hybrid Data Generator:
+    1. Uses REAL Age/Sex/Findings from Shenzhen Metadata.
+    2. Generates SYNTHETIC Survival times based on 'Findings' severity.
     """
-    import os
-    import pandas as pd
+
+    # 1. Load Real Metadata
+    # Assuming metadata CSV has: study_id, sex, age, findings
+    df = pd.read_csv(metadata_path)
     
-    # 1. Get all valid image files
-    valid_exts = {".png", ".jpg", ".jpeg"}
-    image_files = [f for f in os.listdir(image_dir) if os.path.splitext(f)[1].lower() in valid_exts]
-    image_files.sort() # Ensure deterministic order
+    # Clean Sex (Male=1, Female=0)
+    df['sex'] = df['sex'].map({'Male': 1, 'Female': 0, 'M': 1, 'F': 0})
     
-    n_samples = len(image_files)
-    print(f"Found {n_samples} images. Generating matching clinical data...")
+    # 2. Map Images to Metadata
+    # Shenzhen files usually look like "CHNCXR_0001_0.png"
+    # We need to ensure study_id matches the filename or ID in filename
+    image_files = sorted([f for f in os.listdir(image_dir) if f.endswith(".png")])
+    df['filename'] = image_files[:len(df)] # Simple align (Ensure sorted order matches!)
+
+    n_samples = len(df)
+    np.random.seed(42)
+
+    # 3. Generate Missing Clinical Covariates (HIV, Diabetes, etc.)
+    # (These are NOT in the metadata, so we simulate them)
+    df['hiv'] = np.random.binomial(1, 0.15, n_samples) # 15% prevalence
+    df['diabetes'] = np.random.binomial(1, 0.10, n_samples)
+    df['bmi'] = np.random.normal(21, 3, n_samples)
+    df['albumin'] = np.random.normal(3.5, 0.5, n_samples)
+    df['hemoglobin'] = np.random.normal(12, 1.5, n_samples)
+
+    # 4. Generate "Smart" Survival Outcomes based on Real Findings
+    # We define keywords that indicate severe TB
+    severe_keywords = ['bilateral', 'cavity', 'effusion', 'miliary', 'multiple']
     
-    # 2. Generate matching clinical data
-    # We utilize the synthetic generator we defined earlier
-    X_clinical, time, event = generate_synthetic_tb_clinical_data(n_samples=n_samples)
+    def calculate_risk(row):
+        base_risk = 0
+        # Real Data Impact: Older age = higher risk
+        base_risk += (row['age'] - 40) * 0.01 
+        # Real Data Impact: Findings severity
+        finding_text = str(row['findings']).lower()
+        if any(k in finding_text for k in severe_keywords):
+            base_risk += 1.5 # High risk boost for severe findings
+        
+        # Synthetic Comorbidity Impact
+        if row['hiv'] == 1: base_risk += 1.2
+        return base_risk
+
+    # Calculate risk score for every patient
+    risk_scores = df.apply(calculate_risk, axis=1)
     
-    # 3. Combine into a Master DataFrame
-    df = X_clinical.copy()
-    df["image_id"] = image_files
-    df["time"] = time
-    df["event"] = event
+    # Convert Risk to Time (Inverse relationship)
+    # Higher risk = Shorter time to event
+    baseline_hazard = 0.005
+    time_to_event = np.random.exponential(1 / (baseline_hazard * np.exp(risk_scores)))
     
-    # Save for reproducibility
+    # Censoring (some patients survive)
+    censor_time = np.random.uniform(0, time_to_event.max(), n_samples)
+    
+    df['time'] = np.minimum(time_to_event, censor_time)
+    df['event'] = (time_to_event <= censor_time).astype(int)
+
+    # Save
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     df.to_csv(output_path, index=False)
-    print(f"Master dataset saved to {output_path}")
+    print(f"Hybrid dataset created with {len(df)} samples.")
     return df
