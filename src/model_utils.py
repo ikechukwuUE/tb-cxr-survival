@@ -1,98 +1,83 @@
 # src/model_utils.py
 
 import tensorflow as tf
-from tensorflow.keras import layers, models
+from tensorflow.keras import layers, models, regularizers, applications
+from src.config import *
 
-class CrossModalAttention(layers.Layer):
+def cox_ph_loss(y_true, y_pred):
     """
-    Implements a Cross-Attention mechanism to fuse Imaging and Tabular data.
+    Custom Cox Proportional Hazards Loss.
+    """
+    time = y_true[:, 0]
+    event = y_true[:, 1]
+    risk = y_pred[:, 0]
     
-    References:
-    - Wang et al., 2025: "Missing-modality enabled multi-modal fusion architecture..."
-      (Highlights the superiority of attention for heterogeneous data integration)
-    - Zhou et al., 2023: "A transformer-based representation-learning model..."
-      (Demonstrates unified processing of images and structured clinical data)
-    """
-    def __init__(self, embed_dim, **kwargs):
-        super().__init__(**kwargs)
-        self.att = layers.MultiHeadAttention(num_heads=4, key_dim=embed_dim)
-        self.norm = layers.LayerNormalization()
-        self.add = layers.Add()
-
-    def call(self, image_features, tabular_features):
-        # Image features: (Batch, H*W, Channels) - treated as Key/Value
-        # Tabular features: (Batch, 1, Channels) - treated as Query
-        
-        # The tabular data 'queries' the image for relevant visual features
-        attn_out = self.att(
-            query=tabular_features,
-            value=image_features,
-            key=image_features
-        )
-        # Residual connection + Norm
-        return self.norm(self.add([tabular_features, attn_out]))
-
-class TBSurvivalNet(tf.keras.Model):
-    """
-    SOTA Multimodal Survival Model for TB Prognosis.
+    # Risk Set Calculation
+    time_i = tf.expand_dims(time, 1)
+    time_j = tf.expand_dims(time, 0)
+    risk_set_mask = tf.cast(time_j >= time_i, tf.float32)
     
-    Architecture:
-    1. Image Encoder: DenseNet121 (Spatial features preserved)
-    2. Tabular Encoder: MLP with residual connections
-    3. Fusion: Cross-Modal Attention (Tabular queries Image)
-    4. Head: Cox Proportional Hazards (Linear activation)
+    # Log-Sum-Exp Trick
+    risk_max = tf.reduce_max(risk)
+    exp_risk = tf.exp(risk - risk_max)
+    masked_sum_exp = tf.reduce_sum(exp_risk * risk_set_mask, axis=1)
+    log_sum_risk = tf.math.log(masked_sum_exp + 1e-8) + risk_max
     
-    References:
-    - D'Souza et al., 2023: Multiplexed graph neural networks...
-      (Inspiration for modeling complex interactions between modalities)
-    - Dong et al., 2025: Convolutional neural network using MRI...
-      (Supports the fused CNN backbone strategy)
+    # Negative Partial Log Likelihood
+    loss_per_sample = event * (risk - log_sum_risk)
+    return -tf.reduce_mean(loss_per_sample)
+
+def TBSurvivalNet(
+    input_shape_img=(224, 224, 3), 
+    num_clinical_features=9,
+    l2_reg=L2_REG
+):
     """
-    def __init__(self, image_encoder, tabular_dim, embed_dim=256):
-        super().__init__()
-        
-        # 1. Image Encoder (Pretrained CNN)
-        # We unfreeze the top layers for fine-tuning as suggested by Hansun et al., 2023
-        self.image_encoder = image_encoder 
-        self.img_projector = layers.Dense(embed_dim) # Project to common dim
+    TBSurvivalNet: A Multimodal Deep Learning Model for TB Prognosis.
+    
+    Combines DenseNet121 (Vision) and MLP (Clinical) using Cross-Attention.
+    """
+    
+    # --- 1. Image Branch ---
+    img_input = layers.Input(shape=input_shape_img, name="image_input")
+    
+    # Backbone: DenseNet121 (Frozen)
+    base_model = applications.DenseNet121(
+        weights="imagenet", 
+        include_top=False, 
+        input_tensor=img_input
+    )
+    base_model.trainable = False 
+    
+    x_img = base_model.output # (Batch, 7, 7, 1024)
+    x_img = layers.Conv2D(256, (1, 1), activation='relu')(x_img) 
+    x_img_seq = layers.Reshape((-1, 256))(x_img) # (Batch, 49, 256)
 
-        # 2. Tabular Encoder
-        self.tabular_projector = models.Sequential([
-            layers.Dense(embed_dim, activation="gelu"),
-            layers.Dropout(0.2),
-            layers.Dense(embed_dim, activation="gelu")
-        ])
+    # --- 2. Clinical Branch ---
+    tab_input = layers.Input(shape=(num_clinical_features,), name="clinical_input")
+    
+    x_tab = layers.Dense(256, activation="gelu")(tab_input)
+    x_tab = layers.BatchNormalization()(x_tab)
+    x_tab = layers.Dropout(DROPOUT_TABULAR)(x_tab)
+    x_tab_query = layers.Reshape((1, 256))(x_tab) # (Batch, 1, 256)
 
-        # 3. SOTA Fusion: Cross-Attention
-        self.fusion_layer = CrossModalAttention(embed_dim)
+    # --- 3. Cross-Modal Attention Fusion ---
+    # Tabular (Query) attends to Image Patches (Key/Value)
+    attn_layer = layers.MultiHeadAttention(num_heads=4, key_dim=64)
+    attn_out = attn_layer(query=x_tab_query, value=x_img_seq, key=x_img_seq)
+    
+    x_fused = layers.Add()([x_tab_query, attn_out])
+    x_fused = layers.LayerNormalization()(x_fused)
+    x_fused = layers.Flatten()(x_fused)
 
-        # 4. Survival Head
-        self.risk_head = models.Sequential([
-            layers.Flatten(),
-            layers.Dense(64, activation="gelu"),
-            layers.Dropout(0.3),
-            layers.Dense(1, activation="linear", name="log_risk_score") 
-            # Linear activation is required for Cox Partial Likelihood
-        ])
-
-    def call(self, inputs, training=False):
-        images, tabular = inputs
-        
-        # A. Process Images
-        # Shape: (Batch, 7, 7, 1024) for DenseNet121
-        x_img = self.image_encoder(images, training=training) 
-        # Reshape to (Batch, 49, 1024) for attention sequence
-        b, h, w, c = tf.shape(x_img)[0], tf.shape(x_img)[1], tf.shape(x_img)[2], tf.shape(x_img)[3]
-        x_img = tf.reshape(x_img, (b, h * w, c))
-        x_img = self.img_projector(x_img) # (Batch, 49, embed_dim)
-
-        # B. Process Clinical Data
-        x_tab = self.tabular_projector(tabular, training=training) # (Batch, embed_dim)
-        x_tab = tf.expand_dims(x_tab, 1) # (Batch, 1, embed_dim)
-
-        # C. Fuse via Attention
-        # "Clinical-guided visual attention"
-        fused_embedding = self.fusion_layer(x_img, x_tab)
-
-        # D. Predict Risk
-        return self.risk_head(fused_embedding)
+    # --- 4. Survival Head ---
+    x = layers.Dense(64, activation="gelu", kernel_regularizer=regularizers.l2(l2_reg))(x_fused)
+    x = layers.Dropout(DROPOUT_FUSION)(x)
+    
+    # Output: Log Hazard (Linear)
+    output = layers.Dense(1, activation="linear", name="risk_score")(x)
+    
+    # Name the model explicitly "TBSurvivalNet"
+    model = models.Model(inputs=[img_input, tab_input], outputs=output, name="TBSurvivalNet")
+    
+    return model
