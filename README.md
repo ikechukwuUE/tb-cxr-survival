@@ -55,6 +55,7 @@ graph TD
 ```
 
 🧬 Data Pipeline (Hybrid Real + Synthetic)
+
 Due to the scarcity of public TB datasets with complete longitudinal survival data, this project employs a scientifically grounded hybrid approach:
  * Real Images: Uses the Shenzhen Tuberculosis CXR Dataset (Real X-rays, Age, Sex).
  * Synthetic Clinical Data: Missing covariates (HIV, BMI, Diabetes) are synthesized based on epidemiological prevalence.
