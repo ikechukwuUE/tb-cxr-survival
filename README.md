@@ -67,7 +67,9 @@ To prevent Data Leakage, the pipeline enforces:
    * Test (15%): A pure hold-out set for final C-Index calculation.
  * Patient-Level Splitting: Ensures all images from the same patient stay in the same split.
  * Fit/Transform Logic: Tabular scalers (StandardScaler) are fit only on the Training set and applied to Val/Test.
+
 📂 Repository Structure
+```bash
 tb-cxr-survival/
 ├── data/                   # (Ignored by Git)
 │   ├── raw/                # Shenzhen Images
@@ -82,6 +84,7 @@ tb-cxr-survival/
 │   ├── callbacks.py        # Training Callbacks (EarlyStopping, etc.)
 │   └── explainability_utils.py # Grad-CAM & Clinical Patient Reports
 └── outputs/                # Saved models (.keras) and logs
+```
 
 🚀 How to Run
  * Install Dependencies:
@@ -95,11 +98,13 @@ pip install -r requirements.txt
  * Trains TBSurvivalNet with Custom Cox Loss.
  * Evaluates using the Concordance Index (C-Index).
  * Generates Grad-CAM Patient Reports (Explainability).
+   
 📊 Performance Metrics
 The model is evaluated using the Harrell's Concordance Index (C-Index).
  * Random Guessing: 0.50
  * Clinical Baseline (CoxPH): ~0.6114
  * TBSurvivalNet (Target): ~0.6125
+   
 📚 References
  * Wang et al. (2025). "Missing-modality enabled multi-modal fusion architecture for medical data." Journal of Biomedical Informatics.
  * Zhou et al. (2023). "A transformer-based representation-learning model with unified processing of multimodal input." Nature Biomedical Engineering.
