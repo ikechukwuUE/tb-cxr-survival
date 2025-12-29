@@ -74,30 +74,38 @@ def create_matched_dataframe(image_dir, metadata_path, output_path="data/process
     df.to_csv(output_path, index=False)
     return df
 
-def split_and_standardize(df, test_size=0.2):
+
+def split_and_standardize(df, test_size=0.15, val_size=0.15):
     """
     Step 2: Strict Preprocessing
+    - Splits into Train (70%), Val (15%), Test (15%)
     - Splits based on Patient ID (to prevent leakage).
     - Fits StandardScaler ONLY on Train.
-    - Transforms Train and Val.
+    - Transforms Train, Val and test.
     """
-    # Unique patient split
     unique_ids = df['patient_id'].unique()
-    train_ids, val_ids = train_test_split(unique_ids, test_size=test_size, random_state=42)
     
+    # First Split: Train vs (Val + Test)
+    train_ids, temp_ids = train_test_split(unique_ids, test_size=(test_size + val_size), random_state=42)
+    
+    # Second Split: Val vs Test
+    # Adjust proportion: val_size / (val_size + test_size) = 0.5 if sizes are equal
+    val_ids, test_ids = train_test_split(temp_ids, test_size=0.5, random_state=42)
+    
+    # Create Dataframes
     train_df = df[df['patient_id'].isin(train_ids)].copy()
-    val_df = df[df['patient_id'].isin(val_ids)].copy()
+    val_df   = df[df['patient_id'].isin(val_ids)].copy()
+    test_df  = df[df['patient_id'].isin(test_ids)].copy()
     
-    # Standardize Continuous Variables
+    # Fit Scaler on TRAIN only
     scaler = StandardScaler()
-    
-    # FIT on Train, TRANSFORM Train
     train_df[CONTINUOUS_COLS] = scaler.fit_transform(train_df[CONTINUOUS_COLS])
     
-    # TRANSFORM Val (using Train stats)
+    # Transform Val and Test
     val_df[CONTINUOUS_COLS] = scaler.transform(val_df[CONTINUOUS_COLS])
+    test_df[CONTINUOUS_COLS] = scaler.transform(test_df[CONTINUOUS_COLS])
     
-    return train_df, val_df
+    return train_df, val_df, test_df
 
 def preprocess_image(file_path, target_size=IMG_SIZE):
     """

@@ -81,3 +81,40 @@ def TBSurvivalNet(
     model = models.Model(inputs=[img_input, tab_input], outputs=output, name="TBSurvivalNet")
     
     return model
+
+
+# src/model_utils.py (Update this function)
+
+def unfreeze_model(model, num_layers_to_unfreeze=50, learning_rate=LEARNING_RATE_FINE_TUNE):
+    """
+    Unfreezes the top N layers of the CNN model for fine-tuning.
+    """
+    num_layers = len(model.layers)
+    print(f"Total layers in model: {num_layers}")
+    print(f"Unfreezing the last {num_layers_to_unfreeze} layers for fine-tuning...")
+    
+    # 1. Iterate through all layers
+    for i, layer in enumerate(model.layers):
+        # If the layer is in the last N layers...
+        if i >= (num_layers - num_layers_to_unfreeze):
+            
+            # CRITICAL: Keep BatchNormalization layers frozen!
+            # On small medical datasets, updating BN statistics during 
+            # fine-tuning often destroys model performance.
+            if isinstance(layer, tf.keras.layers.BatchNormalization):
+                layer.trainable = False
+            else:
+                layer.trainable = True
+        else:
+            # Ensure lower layers stay frozen
+            layer.trainable = False
+            
+    # 2. Recompile with Low Learning Rate
+    # Note: We must recompile for the 'trainable' flags to take effect
+    optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+    
+    # We assume cox_ph_loss is defined in this file or imported
+    model.compile(optimizer=optimizer, loss=cox_ph_loss)
+    
+    print(f"Model recompiled. Fine-tuning started with LR={learning_rate}")
+    return model

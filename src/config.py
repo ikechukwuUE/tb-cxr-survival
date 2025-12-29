@@ -17,7 +17,9 @@ TABULAR_MULTIPLIER = 4  # hidden_dim = 4 × num_features
 
 BATCH_SIZE = 16
 EPOCHS = 20
+EPOCHS_FINE_TUNE = 10
 LEARNING_RATE = 1e-4
+LEARNING_RATE_FINE_TUNE = 1e-5
 
 DROPOUT_TABULAR = 0.2
 DROPOUT_FUSION = 0.3
@@ -27,10 +29,11 @@ L2_REG = 0.01
 RANDOM_SEED = 42
 
 # Just change this one string to start a fresh experiment
-VERSION = "v2" 
+VERSION = "v1" 
 
 # This updates automatically based on the version above
 MODEL_NAME = f"tbsurvivalnet_{VERSION}"
+FINE_TUNE_MODEL_NAME = f"{MODEL_NAME}_fine-tuned"
 
 # Paths (Dynamic based on model name)
 weights_path = f"outputs/models/{MODEL_NAME}.weights.h5"

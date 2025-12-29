@@ -1,90 +1,20 @@
-# --------------------
-# Core scientific stack
-# --------------------
-numpy
-pandas
+# Core Science
+numpy>=1.24.0
+pandas>=2.0.0
 scipy
+scikit-learn
 
-# --------------------
+# Deep Learning (TensorFlow Only)
+tensorflow>=2.10.0
+# tensorflow-metal  # Uncomment if using Mac M1/M2/M3
+
+# Survival Analysis (Critical)
+lifelines
+
 # Visualization
-# --------------------
 matplotlib
 seaborn
-plotly
 
-# --------------------
-# Machine Learning
-# --------------------
-scikit-learn
-statsmodels
-
-# --------------------
-# Survival analysis (very important for TB, outcomes research)
-# --------------------
-lifelines
-scikit-survival
-
-# --------------------
-# Gradient boosting / tabular ML
-# --------------------
-xgboost
-lightgbm
-catboost
-
-# --------------------
-# Deep Learning
-# --------------------
-tensorflow
-torch
-torchvision
-torchaudio
-keras
-
-# --------------------
-# Medical imaging & image processing
-# --------------------
-opencv-python
-pydicom
-scikit-image
-Pillow
-albumentations
-
-# --------------------
-# Jupyter & notebooks
-# --------------------
-jupyter
-notebook
-ipykernel
-
-# --------------------
-# Experiment tracking & utilities
-# --------------------
+# Utilities
 tqdm
-wandb
-joblib
-
-# --------------------
-# Data handling / file formats
-# --------------------
-openpyxl
-xlrd
-pyarrow
-h5py
-
-# --------------------
-# Model explainability
-# --------------------
-shap
-lime
-
-# --------------------
-# Configuration & reproducibility
-# --------------------
-pyyaml
-python-dotenv
-
-# --------------------
-# Optional but useful (medical + research workflows)
-# --------------------
-imbalanced-learn
-tensorboard
+pydot  # For model.plot_model visualization
