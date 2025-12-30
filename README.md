@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-# 🫁 Multimodal Survival Analysis for Tuberculosis
-=======
 # 🫁 TBSurvivalNet: Multimodal Survival Analysis for Tuberculosis
->>>>>>> dev
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![TensorFlow](https://img.shields.io/badge/TensorFlow-2.10%2B-orange)
@@ -64,6 +60,7 @@ Due to the scarcity of public TB datasets with complete longitudinal survival da
  * Real Images: Uses the Shenzhen Tuberculosis CXR Dataset (Real X-rays, Age, Sex).
  * Synthetic Clinical Data: Missing covariates (HIV, BMI, Diabetes) are synthesized based on epidemiological prevalence.
  * Smart Labeling: Survival times are generated using a probabilistic hazard function based on radiographic severity (e.g., cavitation, miliary patterns) and comorbidities.
+   
 🛡️ Strict Data Hygiene
 To prevent Data Leakage, the pipeline enforces:
  * 3-Way Split:
@@ -115,15 +112,6 @@ The model is evaluated using the Harrell's Concordance Index (C-Index).
  * Zhou et al. (2023). "A transformer-based representation-learning model with unified processing of multimodal input." Nature Biomedical Engineering.
  * Katzman et al. (2018). "DeepSurv: Personalized treatment recommender system using a Cox proportional hazards deep neural network." BMC Medical Research Methodology.
 <!-- end list -->
-
-
-<<<<<<< HEAD
-1. **Wang et al. (2025).** "Missing-modality enabled multi-modal fusion architecture for medical data." *Journal of Biomedical Informatics.*
-2. **Zhou et al. (2023).** "A transformer-based representation-learning model with unified processing of multimodal input." *Nature Biomedical Engineering.*
-3. **D'Souza et al. (2023).** "Fusing modalities by multiplexed graph neural networks for outcome prediction." *Medical Image Analysis.*
-4. **Dong et al. (2025).** "Convolutional neural network... to predict outcome from tuberculosis meningitis." *PLOS One.*
-
----
 
 ## 🤝 Contributing
 
