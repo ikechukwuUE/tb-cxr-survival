@@ -1,106 +1,123 @@
+<<<<<<< HEAD
 # 🫁 Multimodal Survival Analysis for Tuberculosis
+=======
+# 🫁 TBSurvivalNet: Multimodal Survival Analysis for Tuberculosis
+>>>>>>> dev
 
-![Python](https://img.shields.io/badge/Python-3.9%2B-blue)
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![TensorFlow](https://img.shields.io/badge/TensorFlow-2.10%2B-orange)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
 **Author:** Dr. Ikechukwu Ephraim Ugbo, MD  
-**Focus:** Multimodal Deep Learning (CXR + Clinical Data) for Prognosis
+**Focus:** Cross-Modal Deep Learning (CXR + Clinical Data) for Prognosis
 
 ## 📌 Project Overview
-This repository implements a **State-of-the-Art (SOTA) Multimodal AI** framework for predicting time-to-event (survival analysis) in Pulmonary Tuberculosis patients. 
+**TBSurvivalNet** is a State-of-the-Art (SOTA) Multimodal AI framework designed to predict time-to-event (survival analysis) in Pulmonary Tuberculosis patients.
 
-Unlike traditional "Late Fusion" models that simply concatenate features, this project utilizes **Cross-Modal Attention mechanisms** [Wang et al., 2025; Zhou et al., 2023]. This allows clinical covariates (e.g., HIV status, Age) to dynamically "attend" to specific spatial regions of the Chest X-ray, mimicking how a radiologist incorporates clinical context into their visual assessment.
-
-### 🔬 Key Features
-* **Multimodal Architecture:** Integrates unstructured imaging data (CXR) with structured clinical tabular data.
-* **Cross-Modal Attention:** Uses a Transformer-based fusion layer to model non-linear interactions between modalities.
-* **Backbone:** `DenseNet121` (ImageNet weights) without pooling to preserve spatial feature grids ($7 \times 7$).
-* **Loss Function:** Cox Partial Likelihood (Neural Cox Model).
-* **Explainability:** Integrated Grad-CAM visualization to show risk-contributing lung regions.
-* **Data Strategy:** Syncs real Shenzhen CXR images with synthetic clinical covariates to simulate realistic data heterogeneity.
+Unlike traditional "Late Fusion" models, this architecture uses **Cross-Modal Attention**. The model treats clinical variables (e.g., HIV status, Age) as a **Query** that "searches" the Chest X-ray (the **Key/Value**) for relevant spatial features, mimicking how a radiologist uses patient history to focus on specific lung regions.
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ Model Architecture
+The model fuses unstructured imaging data with structured clinical data using a Transformer-based attention block.
 
-The model (`TBSurvivalNet`) follows a 3-stage pipeline:
+```mermaid
+graph TD
+    subgraph INPUTS
+    A["Chest X-Ray<br/>(224 x 224 x 3)"] -->|Input| B
+    C["Clinical Data<br/>(Age, HIV, etc.)"] -->|Input| D
+    end
 
-1.  **Visual Encoder:** `DenseNet121` extracts a $7 \times 7 \times 1024$ feature map.
-2.  **Clinical Encoder:** Multi-layer Perceptron (MLP) projects variables into a shared embedding dimension ($d=256$).
-3.  **Fusion Layer:** A **Multi-Head Cross-Attention** block where:
-    * *Query (Q)* = Clinical Embeddings
-    * *Key (K) / Value (V)* = Visual Spatial Features
-    * *Output* = Context-aware feature vector passed to the Survival Head.
+    subgraph "VISION ENCODER (DenseNet121)"
+    B[CNN Backbone] -->|Freeze Weights| E["Feature Map<br/>(7 x 7 x 1024)"]
+    E -->|1x1 Conv| F["Projected Map<br/>(7 x 7 x 256)"]
+    F -->|Reshape| G["Visual Sequence<br/>(49 x 256)"]
+    end
 
----
+    subgraph "CLINICAL ENCODER (MLP)"
+    D[Tabular Input] -->|"Dense + BatchNorm"| H["Clinical Embedding<br/>(1 x 256)"]
+    H -->|Reshape| I["Query Vector<br/>(1 x 1 x 256)"]
+    end
 
-## 🚀 Getting Started
+    subgraph "CROSS-MODAL ATTENTION FUSION"
+    I -->|"Query (Q)"| J{"Multi-Head<br/>Attention"}
+    G -->|"Key (K) / Value (V)"| J
+    J -->|Attention Scores| K[Weighted Features]
+    I -->|"Residual Add"| L((+))
+    K --> L
+    L -->|LayerNorm| M[Fused Representation]
+    end
 
-### 1. Installation
-Clone the repo and install dependencies in a virtual environment:
+    subgraph "SURVIVAL HEAD"
+    M -->|Flatten| N["Dense Layer (64)"]
+    N -->|Dropout| O[Linear Output]
+    O -->|"Risk Score"| P(("Log Hazard"))
+    end
 
+    style J fill:#f9f,stroke:#333,stroke-width:2px
+    style P fill:#ff9,stroke:#f66,stroke-width:2px
+```
+
+🧬 Data Pipeline (Hybrid Real + Synthetic)
+
+Due to the scarcity of public TB datasets with complete longitudinal survival data, this project employs a scientifically grounded hybrid approach:
+ * Real Images: Uses the Shenzhen Tuberculosis CXR Dataset (Real X-rays, Age, Sex).
+ * Synthetic Clinical Data: Missing covariates (HIV, BMI, Diabetes) are synthesized based on epidemiological prevalence.
+ * Smart Labeling: Survival times are generated using a probabilistic hazard function based on radiographic severity (e.g., cavitation, miliary patterns) and comorbidities.
+🛡️ Strict Data Hygiene
+To prevent Data Leakage, the pipeline enforces:
+ * 3-Way Split:
+   * Train (70%): For learning weights.
+   * Validation (15%): For Early Stopping and Scheduler.
+   * Test (15%): A pure hold-out set for final C-Index calculation.
+ * Patient-Level Splitting: Ensures all images from the same patient stay in the same split.
+ * Fit/Transform Logic: Tabular scalers (StandardScaler) are fit only on the Training set and applied to Val/Test.
+
+📂 Repository Structure
 ```bash
-git clone [https://github.com/ikechukwuUE/tb-cxr-survival.git](https://github.com/ikechukwuUE/tb-cxr-survival.git)
-cd tb-cxr-survival
-
-# Create virtual env
-python -m venv venv
-source venv/bin/activate  # Windows: .\venv\Scripts\activate
-
-# Install requirements
-pip install numpy pandas tensorflow matplotlib scikit-learn lifelines kagglehub
-
-```
-
-### 2. Data Setup
-
-Due to size constraints, the raw data is **not** included in the repo.
-The code automatically handles data fetching:
-
-1. **Images:** The notebook automatically downloads the **Shenzhen Tuberculosis Dataset** via `kagglehub`.
-2. **Clinical Data:** A synthetic data generator creates clinical variables (Age, Sex, HIV, etc.) matched 1:1 with the downloaded images.
-
-### 3. Usage
-
-Run the main Jupyter Notebook:
-
-```bash
-jupyter notebook notebooks/01_tb_cxr_survival.ipynb
-
-```
-
-* **Step 1:** The notebook will download images and generate the `master_dataset.csv`.
-* **Step 2:** It trains the Cross-Modal Attention model.
-* **Step 3:** It outputs the Concordance Index (C-Index) and displays Grad-CAM heatmaps.
-
----
-
-## 📂 Repository Structure
-
-```
 tb-cxr-survival/
 ├── data/                   # (Ignored by Git)
-│   ├── raw/                # Images from Kaggle
+│   ├── raw/                # Shenzhen Images
 │   └── processed/          # master_dataset.csv
 ├── notebooks/
-│   └── 01_tb_cxr_survival.ipynb  # Main training & analysis notebook
+│   └── 01_tb_cxr_survival.ipynb  # Main End-to-End Notebook
 ├── src/
-│   ├── config.py           # Hyperparameters (Batch size, LR, etc.)
-│   ├── data_utils.py       # Loaders & Synthetic Data Generator
-│   ├── model_utils.py      # SOTA Architecture (CrossModalAttention)
-│   ├── survival_utils.py   # Cox Loss & C-Index functions
-│   └── explainability_utils.py # Grad-CAM implementation
-└── outputs/                # Saved models and logs
-
+│   ├── config.py           # Hyperparameters & Seeds
+│   ├── data_utils.py       # Data Loading, Splitting, & Augmentation
+│   ├── model_utils.py      # TBSurvivalNet Architecture
+│   ├── survival_utils.py   # Custom Cox Loss & Hazard Functions
+│   ├── callbacks.py        # Training Callbacks (EarlyStopping, etc.)
+│   └── explainability_utils.py # Grad-CAM & Clinical Patient Reports
+└── outputs/                # Saved models (.keras) and logs
 ```
 
----
+🚀 How to Run
+ * Install Dependencies:
+<!-- end list -->
+pip install -r requirements.txt
 
-## 📚 References
+ * Run the Notebook:
+   Open notebooks/01_tb_cxr_survival.ipynb. The notebook handles the entire pipeline:
+<!-- end list -->
+ * Generates the hybrid dataset automatically.
+ * Trains TBSurvivalNet with Custom Cox Loss.
+ * Evaluates using the Concordance Index (C-Index).
+ * Generates Grad-CAM Patient Reports (Explainability).
+   
+📊 Performance Metrics
+The model is evaluated using the Harrell's Concordance Index (C-Index).
+ * Random Guessing: 0.50
+ * Clinical Baseline (CoxPH): ~0.6114
+ * TBSurvivalNet (Target): ~0.6498
+   
+📚 References
+ * Wang et al. (2025). "Missing-modality enabled multi-modal fusion architecture for medical data." Journal of Biomedical Informatics.
+ * Zhou et al. (2023). "A transformer-based representation-learning model with unified processing of multimodal input." Nature Biomedical Engineering.
+ * Katzman et al. (2018). "DeepSurv: Personalized treatment recommender system using a Cox proportional hazards deep neural network." BMC Medical Research Methodology.
+<!-- end list -->
 
-This project implements concepts from recent literature in medical image analysis:
 
+<<<<<<< HEAD
 1. **Wang et al. (2025).** "Missing-modality enabled multi-modal fusion architecture for medical data." *Journal of Biomedical Informatics.*
 2. **Zhou et al. (2023).** "A transformer-based representation-learning model with unified processing of multimodal input." *Nature Biomedical Engineering.*
 3. **D'Souza et al. (2023).** "Fusing modalities by multiplexed graph neural networks for outcome prediction." *Medical Image Analysis.*

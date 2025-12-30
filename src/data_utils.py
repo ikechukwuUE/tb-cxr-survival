@@ -1,160 +1,177 @@
-# src/data_utils.py
-
+import os
+import re
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
-from src.config import *
-import os
 import tensorflow as tf
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from src.config import *
 
 AUTOTUNE = tf.data.AUTOTUNE
 
-def generate_synthetic_tb_clinical_data(
-    n_samples=1000,
-    seed=RANDOM_SEED,
-    censoring_rate=0.3
-):
+def create_matched_dataframe(image_dir, metadata_path, output_path="data/processed/master_dataset.csv"):
     """
-    This function helps us generate our own synthetic survival data 
-    using selected clinical variables.
+    Step 1: Master Dataset Generation
+    - Loads Real Shenzhen Metadata (Age, Sex, Findings).
+    - Preserves Study ID from Filenames.
+    - Synthesizes missing clinical features (HIV, Diabetes, etc.).
+    - Generates 'Smart' Survival Labels.
     """
-    np.random.seed(seed)
-
-    # Clinical covariates
-    age = np.random.normal(45, 15, n_samples).clip(18, 85)
-    sex = np.random.binomial(1, 0.6, n_samples)  # male=1
-    hiv = np.random.binomial(1, 0.25, n_samples)
-    diabetes = np.random.binomial(1, 0.2, n_samples)
-    bmi = np.random.normal(20, 3, n_samples).clip(14, 35)
-    hemoglobin = np.random.normal(11.5, 1.8, n_samples).clip(7, 17)
-    albumin = np.random.normal(3.2, 0.6, n_samples).clip(1.8, 5)
-    smear_positive = np.random.binomial(1, 0.55, n_samples)
-    retreatment = np.random.binomial(1, 0.15, n_samples)
-
-    # Assemble dataframe
-    X = pd.DataFrame({
-        "age": age,
-        "sex": sex,
-        "hiv": hiv,
-        "diabetes": diabetes,
-        "bmi": bmi,
-        "hemoglobin": hemoglobin,
-        "albumin": albumin,
-        "smear_positive": smear_positive,
-        "retreatment": retreatment
-    })
-
-    # True coefficients (log hazard ratios)
-    beta = np.array([
-        0.03,   # age
-        0.15,   # sex
-        0.9,    # HIV
-        0.5,    # diabetes
-       -0.08,   # BMI
-       -0.12,   # hemoglobin
-       -0.6,    # albumin
-        0.4,    # smear+
-        0.7     # retreatment
-    ])
-
-    linear_predictor = np.dot(X.values, beta)
-
-    # Baseline hazard
-    baseline_hazard = 0.01
-
-    # Event times
-    event_time = np.random.exponential(
-        scale=1 / (baseline_hazard * np.exp(linear_predictor))
-    )
-
-    # Censoring
-    censor_time = np.random.exponential(
-        scale=event_time.mean(),
-        size=n_samples
-    )
-
-    time = np.minimum(event_time, censor_time)
-    event = (event_time <= censor_time).astype(int)
-
-    return X, time, event
-
-
-def load_tb_cxr_dataset(
-    data_dir,
-    image_size=IMG_SIZE,
-    batch_size=BATCH_SIZE,
-    shuffle=True,
-    label_mode="binary",
-    seed=RANDOM_SEED
-):
-    """
-    Load TB Chest X-ray images from a Kaggle-style directory
-    using a TensorFlow data pipeline.
-    """
-
-    if not os.path.exists(data_dir):
-        raise ValueError(f"Data directory not found: {data_dir}")
-
-    dataset = tf.keras.utils.image_dataset_from_directory(
-        directory=data_dir,
-        labels="inferred" if label_mode else None,
-        label_mode="binary" if label_mode else None,
-        image_size=image_size,
-        batch_size=batch_size,
-        shuffle=shuffle,
-        seed=seed
-    )
-
-    # Normalize images to [0, 1]
-    def normalize(image, label=None):
-        image = tf.cast(image, tf.float32) / 255.0
-        return (image, label) if label is not None else image
-
-    dataset = dataset.map(normalize, num_parallel_calls=AUTOTUNE)
-    dataset = dataset.prefetch(AUTOTUNE)
-
-    return dataset
-
-
-def train_val_split(X_img, X_tab, time, event, test_size=0.2, seed=42):
-    return train_test_split(
-        X_img, X_tab, time, event,
-        test_size=test_size,
-        random_state=seed,
-        stratify=event
-    )
-
-
-def create_matched_dataframe(image_dir, output_path="data/processed/master_dataset.csv"):
-    """
-    Creates a synchronized dataset linking Shenzhen CXR images with synthetic clinical data.
+    # 1. Load Real Metadata
+    df = pd.read_csv(metadata_path)
     
-    This addresses the data heterogeneity challenge highlighted in D'Souza et al., 2023,
-    ensuring every image has a corresponding clinical vector for multimodal training.
-    """
-    import os
-    import pandas as pd
+    # 2. Align with Images
+    # Shenzhen filenames: "CHNCXR_0001_0.png" -> ID is "0001"
+    # We sort to ensure alignment if metadata is also sorted
+    image_files = sorted([f for f in os.listdir(image_dir) if f.endswith(".png")])
     
-    # 1. Get all valid image files
-    valid_exts = {".png", ".jpg", ".jpeg"}
-    image_files = [f for f in os.listdir(image_dir) if os.path.splitext(f)[1].lower() in valid_exts]
-    image_files.sort() # Ensure deterministic order
+    # Filter metadata to match available images
+    min_len = min(len(df), len(image_files))
+    df = df.iloc[:min_len].copy()
+    df['filename'] = image_files[:min_len]
     
-    n_samples = len(image_files)
-    print(f"Found {n_samples} images. Generating matching clinical data...")
+    # Extract Study ID for Splitting (Prevents Leakage)
+    # Extracts "0001" from "CHNCXR_0001_0.png"
+    df['patient_id'] = df['filename'].apply(lambda x: x.split('_')[1] if '_' in x else x)
+
+    # 3. Clean Real Data
+    df['sex'] = df['sex'].map({'Male': 1, 'Female': 0, 'M': 1, 'F': 0})
     
-    # 2. Generate matching clinical data
-    # We utilize the synthetic generator we defined earlier
-    X_clinical, time, event = generate_synthetic_tb_clinical_data(n_samples=n_samples)
+    # 4. Generate Synthetic Clinical Data
+    np.random.seed(42)
+    n = len(df)
     
-    # 3. Combine into a Master DataFrame
-    df = X_clinical.copy()
-    df["image_id"] = image_files
-    df["time"] = time
-    df["event"] = event
+    df['hiv'] = np.random.binomial(1, 0.15, n)
+    df['diabetes'] = np.random.binomial(1, 0.10, n)
+    df['bmi'] = np.random.normal(21, 3, n).clip(15, 35)
+    df['hemoglobin'] = np.random.normal(12.5, 1.5, n).clip(8, 16)
+    df['albumin'] = np.random.normal(3.5, 0.5, n).clip(2.5, 5.0)
+    df['smear_positive'] = np.random.binomial(1, 0.5, n)
+    df['retreatment'] = np.random.binomial(1, 0.2, n)
+
+    # 5. Generate Smart Survival Targets
+    # Risk increases with Age, HIV, and Severe Findings
+    severe_keywords = ['bilateral', 'cavity', 'effusion', 'miliary']
     
-    # Save for reproducibility
+    def get_risk(row):
+        r = 0
+        r += (row['age'] - 40) * 0.01
+        if any(k in str(row['findings']).lower() for k in severe_keywords):
+            r += 1.5
+        if row['hiv'] == 1: r += 1.2
+        return r
+
+    risk_scores = df.apply(get_risk, axis=1)
+    baseline_hazard = 0.005
+    time_event = np.random.exponential(1 / (baseline_hazard * np.exp(risk_scores)))
+    censor = np.random.uniform(0, time_event.max(), n)
+    
+    df['time'] = np.minimum(time_event, censor)
+    df['event'] = (time_event <= censor).astype(int)
+
+    # Save
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     df.to_csv(output_path, index=False)
-    print(f"Master dataset saved to {output_path}")
     return df
+
+
+def split_and_standardize(df, test_size=0.15, val_size=0.15):
+    """
+    Step 2: Strict Preprocessing
+    - Splits into Train (70%), Val (15%), Test (15%)
+    - Splits based on Patient ID (to prevent leakage).
+    - Fits StandardScaler ONLY on Train.
+    - Transforms Train, Val and test.
+    """
+    unique_ids = df['patient_id'].unique()
+    
+    # First Split: Train vs (Val + Test)
+    train_ids, temp_ids = train_test_split(unique_ids, test_size=(test_size + val_size), random_state=42)
+    
+    # Second Split: Val vs Test
+    # Adjust proportion: val_size / (val_size + test_size) = 0.5 if sizes are equal
+    val_ids, test_ids = train_test_split(temp_ids, test_size=0.5, random_state=42)
+    
+    # Create Dataframes
+    train_df = df[df['patient_id'].isin(train_ids)].copy()
+    val_df   = df[df['patient_id'].isin(val_ids)].copy()
+    test_df  = df[df['patient_id'].isin(test_ids)].copy()
+    
+    # Fit Scaler on TRAIN only
+    scaler = StandardScaler()
+    train_df[CONTINUOUS_COLS] = scaler.fit_transform(train_df[CONTINUOUS_COLS])
+    
+    # Transform Val and Test
+    val_df[CONTINUOUS_COLS] = scaler.transform(val_df[CONTINUOUS_COLS])
+    test_df[CONTINUOUS_COLS] = scaler.transform(test_df[CONTINUOUS_COLS])
+    
+    return train_df, val_df, test_df
+
+def preprocess_image(file_path, target_size=IMG_SIZE):
+    """
+    Step 3: Image Standardization
+    - Reads Image.
+    - Resizes.
+    - Applies Sample-wise Standardization (Mean=0, Std=1 per image).
+    """
+    img = tf.io.read_file(file_path)
+    img = tf.image.decode_png(img, channels=3)
+    img = tf.image.resize(img, target_size)
+    
+    # Per-Image Standardization
+    # Allows Val set to be standardized exactly like Train without leaking stats
+    img = tf.image.per_image_standardization(img)
+    return img
+
+def get_augmenter():
+    """
+    Step 4: Augmentation Configuration
+    - Rotation and Brightness ONLY (No flipping).
+    """
+    return tf.keras.Sequential([
+        tf.keras.layers.RandomRotation(factor=0.1), # +/- 10% rotation
+        tf.keras.layers.RandomContrast(factor=0.2)
+    ])
+
+def load_tb_cxr_dataset(dataframe, data_dir, batch_size=32, shuffle=True, augment=False):
+    """
+    Step 5: Pipeline Construction
+    - Merges Image and Tabular Data.
+    - Applies Augmentation on the fly.
+    """
+    file_paths = [os.path.join(data_dir, f) for f in dataframe['filename']]
+    
+    # Select preprocessed columns
+    X_tab = dataframe[ALL_CLINICAL_COLS].values.astype("float32")
+    y = dataframe[["time", "event"]].values.astype("float32")
+    
+    # Create Dataset
+    ds = tf.data.Dataset.from_tensor_slices((file_paths, X_tab, y))
+
+    def _mapper(path, tab, target):
+        img = preprocess_image(path)
+        return (img, tab), target
+
+    # Augmentation Wrapper
+    augmenter = get_augmenter()
+    
+    def _augment_wrapper(inputs, target):
+        (img, tab) = inputs
+        
+        # Expand dims for Keras Layer (H,W,C) -> (1,H,W,C)
+        img_batch = tf.expand_dims(img, 0)
+        img_aug = augmenter(img_batch, training=True)
+        img = tf.squeeze(img_aug, 0)
+        
+        return (img, tab), target
+
+    ds = ds.map(_mapper, num_parallel_calls=AUTOTUNE)
+
+    if augment:
+        ds = ds.map(_augment_wrapper, num_parallel_calls=AUTOTUNE)
+
+    if shuffle:
+        ds = ds.shuffle(buffer_size=1000)
+    
+    ds = ds.batch(batch_size).prefetch(AUTOTUNE)
+    return ds
