@@ -104,7 +104,7 @@ pip install -r requirements.txt
 The model is evaluated using the Harrell's Concordance Index (C-Index).
  * Random Guessing: 0.50
  * Clinical Baseline (CoxPH): ~0.6114
- * TBSurvivalNet (Target): ~0.6125
+ * TBSurvivalNet (Target): ~0.6498
    
 📚 References
  * Wang et al. (2025). "Missing-modality enabled multi-modal fusion architecture for medical data." Journal of Biomedical Informatics.
