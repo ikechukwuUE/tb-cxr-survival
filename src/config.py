@@ -35,7 +35,7 @@ L2_REG = 0.01
 RANDOM_SEED = 42
 
 # Just change this one string to start a fresh experiment
-VERSION = "v3" 
+VERSION = "v4" 
 
 # This updates automatically based on the version above
 MODEL_NAME = f"tbsurvivalnet_{VERSION}"

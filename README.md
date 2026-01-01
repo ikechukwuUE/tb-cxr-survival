@@ -14,8 +14,13 @@ Unlike traditional "Late Fusion" models, this architecture utilizes **Gated Cros
 
 ---
 
+<<<<<<< Updated upstream
 ## 🏗️ Model Architecture (V3: EfficientNet + Gated Fusion)
 The V3 architecture upgrades the backbone to **EfficientNetV2B0** and implements a learnable gate ($z$) to balance modalities.
+=======
+## 🏗️ Model Architecture (DenseNet121 + Gated Fusion)
+The model fuses unstructured imaging data with structured clinical data using a Transformer-based attention block. We utilize **DenseNet121** as the visual backbone due to its feature reuse capabilities, which are critical for detecting subtle pulmonary pathologies.
+>>>>>>> Stashed changes
 
 ```mermaid
 graph TD
@@ -60,9 +65,15 @@ graph TD
 
 ### 🔬 Key Features
 
+<<<<<<< Updated upstream
 * **Backbone:** `EfficientNetV2B0` for superior parameter efficiency and convergence speed.
 * **Gated Fusion:** A learnable "valve" that dynamically decides whether to trust the Image or Clinical data more for each specific patient. Inspired by **Ma et al. (CVPR 2022)**.
 * **Training Dynamics:** Uses **Cosine Decay with Warmup** to stabilize the Attention layers during early training.
+=======
+* **Backbone:** `DenseNet121` (Pretrained on ImageNet) selected for robust feature propagation.
+* **Gated Fusion:** A learnable "valve" that dynamically decides whether to trust the Image or Clinical data more for each specific patient. Inspired by **Ma et al. (CVPR 2022)**.
+* **Training Dynamics:** Uses **Cosine Decay with Warmup** to stabilize the Attention layers.
+>>>>>>> Stashed changes
 * **Loss Function:** Neural Cox Partial Likelihood.
 
 ---
@@ -138,7 +149,11 @@ The model is evaluated using the **Harrell's Concordance Index (C-Index)** on th
 
 * **Random Guessing:** 0.50
 * **Clinical Baseline (CoxPH):** ~0.6114
+<<<<<<< Updated upstream
 * **TBSurvivalNet V3 (Target):** ~0.6252
+=======
+* **TBSurvivalNet (Target):** ~0.6429
+>>>>>>> Stashed changes
 
 ---
 
@@ -151,4 +166,8 @@ The model is evaluated using the **Harrell's Concordance Index (C-Index)** on th
 
 ```
 
+<<<<<<< Updated upstream
 ```
+=======
+```
+>>>>>>> Stashed changes
